@@ -412,7 +412,54 @@
     /* ===== Finale ===== */
     #finaleCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
     .finale-wrap{position:relative;z-index:2}
-    .finale-heart{font-size:4rem;animation:heartbeat 1.8s ease-in-out infinite;display:inline-block}
+    .finale-heart{
+      font-size:4rem;animation:heartbeat 1.8s ease-in-out infinite;display:inline-block;
+      cursor:pointer;-webkit-user-select:none;user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+
+    /* ===== Typewriter ===== */
+    .typewriter-cursor{
+      display:inline-block;width:2px;height:1.2em;
+      background:var(--accent);margin-left:2px;
+      vertical-align:text-bottom;
+      animation:blink 0.7s step-end infinite;
+    }
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+    /* ===== Secret message ===== */
+    .secret-overlay{
+      position:fixed;top:0;left:0;width:100%;height:100%;z-index:100;
+      background:rgba(26,10,20,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;visibility:hidden;transition:opacity 0.6s ease;
+      padding:20px;
+    }
+    .secret-overlay.show{opacity:1;visibility:visible}
+    .secret-card{
+      max-width:380px;width:100%;text-align:center;
+      transform:scale(0.85);transition:transform 0.5s ease;
+    }
+    .secret-overlay.show .secret-card{transform:scale(1)}
+    .secret-emoji{font-size:3rem;margin-bottom:12px;display:block}
+    .secret-title{
+      font-family:'Cormorant Garamond',serif;font-size:1.6rem;
+      font-weight:600;color:var(--accent);margin-bottom:12px;
+    }
+    .secret-text{
+      font-family:'Caveat',cursive;font-size:1.3rem;
+      color:var(--text);line-height:1.6;
+    }
+    .secret-close{
+      margin-top:20px;background:none;
+      border:1px solid rgba(242,166,201,0.3);color:var(--accent);
+      border-radius:50px;padding:10px 28px;font-size:0.9rem;
+      cursor:pointer;transition:all 0.3s;font-family:'Inter',sans-serif;
+      -webkit-appearance:none;appearance:none;
+    }
+    .secret-close:hover{background:rgba(242,166,201,0.1)}
+    .hidden-sign{opacity:0;transition:opacity 0.8s ease}
+    .hidden-sign.show{opacity:1}
 
     /* ===== Page counter ===== */
     .page-counter{
@@ -685,15 +732,27 @@
 <div class="page" id="p12" style="position:relative">
   <canvas id="finaleCanvas"></canvas>
   <div class="page-content finale-wrap">
-    <div class="finale-heart">💖</div>
+    <div class="finale-heart" id="finaleHeart">💖</div>
     <h1>Спасибо, что ты есть,<br>Кисаня</h1>
     <div class="glass">
-      <p class="handwriting" style="font-size:1.35rem">
-        Год с тобой пролетел как один день. Ты сделала мою жизнь ярче, теплее и счастливее. Я не умею красиво говорить, но знай — ты для меня всё. Я тебя ЛЮБЛЮ!!! 
-      </p>
-      <p style="margin-top:10px;color:var(--accent2);font-size:1.1rem">Навсегда твой. С годовщиной нас, любимая! 💖</p>
+      <p class="handwriting" style="font-size:1.35rem" id="finaleText"></p>
+      <p style="margin-top:10px;color:var(--accent2);font-size:1.1rem" id="finaleSign" class="hidden-sign">Навсегда твой. С годовщиной нас, любимая! 💖</p>
     </div>
     <button class="nav-btn nav-btn-outline" onclick="restart()">↻ Пересмотреть</button>
+  </div>
+</div>
+
+<!-- Secret message overlay -->
+<div class="secret-overlay" id="secretOverlay">
+  <div class="secret-card glass">
+    <span class="secret-emoji">💌</span>
+    <div class="secret-title">Секретное послание</div>
+    <div class="secret-text">
+      Ты нашла секретик! 💖<br><br>
+      Знаешь, что я делаю каждый раз, когда скучаю по тебе? Закрываю глаза и представляю твою улыбку. И сразу становится теплее.<br><br>
+      Ты — моё самое большое счастье и самое красивое совпадение во вселенной. Я буду любить тебя всегда. Всегда-всегда. 💕
+    </div>
+    <button class="secret-close" id="secretClose">Спрятать обратно 💖</button>
   </div>
 </div>
 
@@ -741,7 +800,7 @@ window.goPage = function(n){
   if(n===8) revealReasons();
   if(n===9) startDrawing();
   if(n===11) updateBdays();
-  if(n===12){resizeFinale();initFinale();animFinale();startConfetti()}
+  if(n===12){resizeFinale();initFinale();animFinale();startConfetti();startTypewriter()}
 };
 
 // ===== Bokeh particles =====
@@ -1112,11 +1171,55 @@ window.restart=function(){
   document.querySelectorAll('.tl-item').forEach(i=>i.classList.remove('show'));
   document.querySelectorAll('.moment-card').forEach(i=>i.classList.remove('show'));
   confettiRunning=false;
+  twDone=false;if(twTimer){clearInterval(twTimer);twTimer=null}
+  document.getElementById('finaleText').innerHTML='';
+  document.getElementById('finaleSign').classList.remove('show');
   if(counterInterval){clearInterval(counterInterval);counterInterval=null}
   fRunning=false;
   pages.forEach(p=>{p.classList.remove('active','exit-up','exit-down')});
   cur=0;pages[0].classList.add('active');updateDots();
 };
+
+// ===== Typewriter effect =====
+var twText='Год с тобой пролетел как один день. Ты сделала мою жизнь ярче, теплее и счастливее. Я не умею красиво говорить, но знай — ты для меня всё. Я тебя ЛЮБЛЮ!!!';
+var twDone=false,twTimer=null;
+function startTypewriter(){
+  if(twDone)return;
+  var el=document.getElementById('finaleText');
+  var sign=document.getElementById('finaleSign');
+  el.innerHTML='';sign.classList.remove('show');
+  var i=0;
+  var cursor=document.createElement('span');cursor.className='typewriter-cursor';
+  el.appendChild(cursor);
+  twTimer=setInterval(function(){
+    if(i<twText.length){
+      el.insertBefore(document.createTextNode(twText[i]),cursor);
+      i++;
+    }else{
+      clearInterval(twTimer);twDone=true;
+      setTimeout(function(){cursor.remove()},1500);
+      setTimeout(function(){sign.classList.add('show')},800);
+    }
+  },45);
+}
+
+// ===== Secret message (long press on finale heart) =====
+var secretOverlay=document.getElementById('secretOverlay');
+var finaleHeart=document.getElementById('finaleHeart');
+var secretClose=document.getElementById('secretClose');
+var longPressTimer=null;
+
+function showSecret(){secretOverlay.classList.add('show')}
+function hideSecret(){secretOverlay.classList.remove('show')}
+
+finaleHeart.addEventListener('mousedown',function(e){e.preventDefault();longPressTimer=setTimeout(showSecret,800)});
+finaleHeart.addEventListener('mouseup',function(){clearTimeout(longPressTimer)});
+finaleHeart.addEventListener('mouseleave',function(){clearTimeout(longPressTimer)});
+finaleHeart.addEventListener('touchstart',function(e){longPressTimer=setTimeout(showSecret,800)},{passive:true});
+finaleHeart.addEventListener('touchend',function(){clearTimeout(longPressTimer)},{passive:true});
+finaleHeart.addEventListener('touchcancel',function(){clearTimeout(longPressTimer)},{passive:true});
+secretClose.addEventListener('click',hideSecret);
+secretOverlay.addEventListener('click',function(e){if(e.target===secretOverlay)hideSecret()});
 
 // ===== Swipe navigation (mobile) =====
 var touchStartY=0,touchStartX=0,swiping=false;
