@@ -185,9 +185,11 @@
       background:none;border:none;color:var(--text);font-size:0;
       cursor:pointer;padding:8px;transition:color 0.2s;
       display:flex;align-items:center;justify-content:center;
+      -webkit-appearance:none;appearance:none;
+      -webkit-tap-highlight-color:transparent;
     }
     .p-btn:hover{color:var(--accent)}
-    .p-btn svg{width:20px;height:20px;fill:currentColor}
+    .p-btn svg{width:24px;height:24px;fill:currentColor}
     .play-btn{
       width:50px;height:50px;border-radius:50%;
       background:linear-gradient(135deg,var(--accent),var(--accent2));
@@ -195,6 +197,8 @@
       cursor:pointer;box-shadow:0 4px 16px var(--glow);
       display:flex;align-items:center;justify-content:center;
       transition:transform 0.2s;
+      -webkit-appearance:none;appearance:none;
+      -webkit-tap-highlight-color:transparent;
     }
     .play-btn svg{width:22px;height:22px;fill:currentColor}
     .play-btn:hover{transform:scale(1.08)}
@@ -426,10 +430,12 @@
       position:fixed;bottom:16px;right:16px;z-index:50;
       width:44px;height:44px;border-radius:50%;
       background:linear-gradient(135deg,var(--accent),var(--accent2));
-      border:none;color:var(--bg);font-size:1.1rem;cursor:pointer;
+      border:none;color:var(--bg);font-size:0;cursor:pointer;
       box-shadow:0 4px 16px var(--glow);
       display:none;align-items:center;justify-content:center;
       transition:transform 0.2s;
+      -webkit-appearance:none;appearance:none;
+      -webkit-tap-highlight-color:transparent;
     }
     .mini-player.show{display:flex}
     .mini-player:hover{transform:scale(1.1)}
@@ -494,33 +500,27 @@
     <p class="subtitle">Каждую мелочь... потому что для меня нет мелочей, когда дело касается тебя</p>
     <div class="glass" style="margin-top:8px">
       <div class="tabs-header" id="tabsHeader">
-        <button class="tab-btn active" data-tab="0">🎵 Музыка</button>
-        <button class="tab-btn" data-tab="1">🍕 Еда</button>
-        <button class="tab-btn" data-tab="2">🎬 Фильм</button>
-        <button class="tab-btn" data-tab="3">🌸 Мечта</button>
-        <button class="tab-btn" data-tab="4">💭 Привычка</button>
+        <button class="tab-btn active" data-tab="0">🍕 Еда</button>
+        <button class="tab-btn" data-tab="1">🎬 Фильм</button>
+        <button class="tab-btn" data-tab="2">🌸 Мечта</button>
+        <button class="tab-btn" data-tab="3">💭 Привычка</button>
       </div>
       <div class="tab-content active" data-tab="0">
-        <span class="tab-emoji">🎶</span>
-        <p>Я помню, кто твой любимый исполнитель</p>
-        <div class="tab-value">Валентин Стрыкало</div>
-      </div>
-      <div class="tab-content" data-tab="1">
         <span class="tab-emoji">🍽️</span>
         <p>Я помню, что ты любишь есть</p>
         <div class="tab-value">Шоколадный торт</div>
       </div>
-      <div class="tab-content" data-tab="2">
+      <div class="tab-content" data-tab="1">
         <span class="tab-emoji">🎥</span>
         <p>Я помню твой любимый фильм</p>
         <div class="tab-value">Дневник памяти</div>
       </div>
-      <div class="tab-content" data-tab="3">
+      <div class="tab-content" data-tab="2">
         <span class="tab-emoji">✨</span>
         <p>Я помню, о чём ты мечтаешь</p>
         <div class="tab-value">О белом доме с голубыми ставнями и комнатой для рисования с видом на реку</div>
       </div>
-      <div class="tab-content" data-tab="4">
+      <div class="tab-content" data-tab="3">
         <span class="tab-emoji">🥰</span>
         <p>Я помню твою милую привычку</p>
         <div class="tab-value">Трогать волосы при разговоре со мной</div>
@@ -537,16 +537,19 @@
     <div class="divider"></div>
     <p class="subtitle">...и включаю его для нас</p>
     <div class="vinyl" id="vinyl">
-      <div class="vinyl-bg"><div class="vinyl-center">🎵</div></div>
+      <div class="vinyl-bg"><div class="vinyl-center"><svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" style="color:var(--bg)"><path d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 13.79 6 16s2.01 4 4.5 4S15 18.21 15 16V6h4V3h-7z"/></svg></div></div>
     </div>
     <div style="margin-top:8px">
       <div class="song-title" id="songTitle">Всё решено</div>
       <div class="song-artist" id="songArtist">Валентин Стрыкало</div>
     </div>
     <div class="player-row">
+      <button class="p-btn" id="prevBtn" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
       <button class="play-btn" id="playBtn"><svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="p-btn" id="nextBtn" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zm-10 0l8.5 6L6 18z"/></svg></button>
     </div>
     <div class="progress" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="track-dots" id="trackDots"></div>
     <button class="nav-btn" onclick="goPage(4)" style="margin-top:12px">Дальше →</button>
   </div>
 </div>
@@ -700,7 +703,7 @@
 </audio>
 
 <!-- Mini player -->
-<button class="mini-player" id="miniPlayer">🎵</button>
+<button class="mini-player" id="miniPlayer"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" id="miniIcon"><path d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 13.79 6 16s2.01 4 4.5 4S15 18.21 15 16V6h4V3h-7z"/></svg></button>
 
 <script>
 (function(){
@@ -882,39 +885,75 @@ function startConfetti(){
   animConfetti();
 }
 
-// ===== Music (single track, iOS-safe) =====
+// ===== Music (multi-track, iOS-safe, SVG buttons) =====
+var tracks=[
+  {src:'assets/vse-resheno.mp3',title:'Всё решено',artist:'Валентин Стрыкало'},
+  {src:'assets/pervomay.mp3',title:'Первомай',artist:'Валентин Стрыкало'}
+];
+var trackIdx=0;
 var isPlaying=false,audioStarted=false;
 var audio=document.getElementById('audioPlayer');
 var vinyl=document.getElementById('vinyl');
 var playBtn=document.getElementById('playBtn');
 var miniPlayer=document.getElementById('miniPlayer');
+var miniIcon=document.getElementById('miniIcon');
+var prevBtn=document.getElementById('prevBtn');
+var nextBtn=document.getElementById('nextBtn');
+
+var svgNote='<path d="M12 3v9.28a4.39 4.39 0 0 0-1.5-.28C8.01 12 6 13.79 6 16s2.01 4 4.5 4S15 18.21 15 16V6h4V3h-7z"/>';
+var svgPause='<path d="M6 19h4V5H6zm8-14v14h4V5z"/>';
 
 function setPlayIcon(){document.getElementById('playIcon').innerHTML='<path d="M8 5v14l11-7z"/>'}
 function setPauseIcon(){document.getElementById('playIcon').innerHTML='<path d="M6 19h4V5H6zm8-14v14h4V5z"/>'}
+function setMiniNote(){miniIcon.innerHTML=svgNote}
+function setMiniPause(){miniIcon.innerHTML=svgPause}
+
+function renderTrackDots(){
+  var dotsEl=document.getElementById('trackDots');dotsEl.innerHTML='';
+  tracks.forEach(function(_,i){
+    var d=document.createElement('button');d.className='dot'+(i===trackIdx?' on':'');
+    d.addEventListener('click',function(){switchTrack(i)});
+    dotsEl.appendChild(d);
+  });
+}
+renderTrackDots();
+
+function switchTrack(idx){
+  var wasPlaying=isPlaying;
+  if(isPlaying){audio.pause();isPlaying=false}
+  trackIdx=idx;
+  audio.src=tracks[trackIdx].src;
+  audio.load();
+  document.getElementById('songTitle').textContent=tracks[trackIdx].title;
+  document.getElementById('songArtist').textContent=tracks[trackIdx].artist;
+  document.getElementById('progressFill').style.width='0%';
+  renderTrackDots();
+  if(wasPlaying||audioStarted){playAudio()}
+}
 
 function playAudio(){
   audio.play().then(function(){
     isPlaying=true;audioStarted=true;setPauseIcon();
-    vinyl.classList.add('spin');miniPlayer.textContent='⏸';
+    vinyl.classList.add('spin');setMiniPause();
   }).catch(function(){});
 }
 function pauseAudio(){
   audio.pause();isPlaying=false;setPlayIcon();
-  vinyl.classList.remove('spin');miniPlayer.textContent='🎵';
+  vinyl.classList.remove('spin');setMiniNote();
 }
 function handlePlay(e){
   if(e)e.preventDefault();
   if(isPlaying){pauseAudio()}else{playAudio()}
 }
 
-// Attach to play button, vinyl, and mini player
+prevBtn.addEventListener('click',function(e){e.stopPropagation();switchTrack((trackIdx-1+tracks.length)%tracks.length)});
+nextBtn.addEventListener('click',function(e){e.stopPropagation();switchTrack((trackIdx+1)%tracks.length)});
+
 [playBtn,vinyl,miniPlayer].forEach(function(el){
   el.addEventListener('click',handlePlay);
 });
 
-// Loop on end
-audio.addEventListener('ended',function(){audio.currentTime=0;playAudio()});
-// Progress bar
+audio.addEventListener('ended',function(){switchTrack((trackIdx+1)%tracks.length)});
 audio.addEventListener('timeupdate',function(){if(audio.duration)document.getElementById('progressFill').style.width=(audio.currentTime/audio.duration*100)+'%'});
 document.getElementById('progressBar').addEventListener('click',function(e){var r=e.currentTarget.getBoundingClientRect();audio.currentTime=(e.clientX-r.left)/r.width*audio.duration});
 
@@ -1059,7 +1098,12 @@ addEventListener('resize',()=>{if(fRunning)resizeFinale()});
 // ===== Restart =====
 window.restart=function(){
   audio.pause();audio.currentTime=0;isPlaying=false;audioStarted=false;
+  trackIdx=0;audio.src=tracks[0].src;
+  document.getElementById('songTitle').textContent=tracks[0].title;
+  document.getElementById('songArtist').textContent=tracks[0].artist;
+  renderTrackDots();
   document.getElementById('playIcon').innerHTML='<path d="M8 5v14l11-7z"/>';vinyl.classList.remove('spin');
+  setMiniNote();
   miniPlayer.classList.remove('show');
   drawDone=false;if(drawAF)cancelAnimationFrame(drawAF);
   dx.clearRect(0,0,dc.width,dc.height);
@@ -1073,6 +1117,23 @@ window.restart=function(){
   pages.forEach(p=>{p.classList.remove('active','exit-up','exit-down')});
   cur=0;pages[0].classList.add('active');updateDots();
 };
+
+// ===== Swipe navigation (mobile) =====
+var touchStartY=0,touchStartX=0,swiping=false;
+document.addEventListener('touchstart',function(e){
+  touchStartY=e.touches[0].clientY;
+  touchStartX=e.touches[0].clientX;
+  swiping=true;
+},{passive:true});
+document.addEventListener('touchend',function(e){
+  if(!swiping)return;swiping=false;
+  var dy=e.changedTouches[0].clientY-touchStartY;
+  var dx2=e.changedTouches[0].clientX-touchStartX;
+  if(Math.abs(dx2)>Math.abs(dy))return;
+  if(Math.abs(dy)<50)return;
+  if(dy<0&&cur<TOTAL_PAGES-1){goPage(cur+1)}
+  else if(dy>0&&cur>0){goPage(cur-1)}
+},{passive:true});
 
 })();
 </script>
