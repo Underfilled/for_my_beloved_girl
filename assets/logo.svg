@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6C5CE7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A29BFE;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="arrow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DFE6E9;stop-opacity:0.9" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="250" fill="url(#bg)" />
+
+  <!-- Circular arrows (recycling/rotation symbol) -->
+  <!-- Arrow 1 - top -->
+  <path d="M 256 100
+           A 130 130 0 0 1 369 198"
+        fill="none" stroke="white" stroke-width="28" stroke-linecap="round"/>
+  <polygon points="379,178 395,215 355,210" fill="white"/>
+
+  <!-- Arrow 2 - bottom-right -->
+  <path d="M 369 310
+           A 130 130 0 0 1 200 380"
+        fill="none" stroke="white" stroke-width="28" stroke-linecap="round"/>
+  <polygon points="215,393 178,378 195,345" fill="white"/>
+
+  <!-- Arrow 3 - bottom-left -->
+  <path d="M 160 200
+           A 130 130 0 0 1 256 100"
+        fill="none" stroke="white" stroke-width="28" stroke-linecap="round"/>
+  <polygon points="145,215 130,178 168,183" fill="white"/>
+
+  <!-- Center play circle (video note) -->
+  <circle cx="256" cy="256" r="55" fill="rgba(255,255,255,0.2)" stroke="white" stroke-width="4"/>
+
+  <!-- Play triangle -->
+  <polygon points="243,230 243,282 280,256" fill="white"/>
+
+  <!-- Text -->
+  <text x="256" y="460" text-anchor="middle" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="white" letter-spacing="3">
+    КРУГОВОРОТ
+  </text>
+</svg>
