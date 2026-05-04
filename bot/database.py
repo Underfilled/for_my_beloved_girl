@@ -1,6 +1,5 @@
 import aiosqlite
 import os
-from datetime import datetime, timedelta, timezone
 
 
 class Database:
@@ -24,40 +23,83 @@ class Database:
         await self._db.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                mode TEXT DEFAULT NULL,
-                dialog_partner_id INTEGER DEFAULT NULL,
+                whispers_sent INTEGER DEFAULT 0,
+                whispers_listened INTEGER DEFAULT 0,
+                reactions_received INTEGER DEFAULT 0,
+                whisper_backs_received INTEGER DEFAULT 0,
                 is_banned INTEGER DEFAULT 0,
                 reports_count INTEGER DEFAULT 0,
-                circles_sent INTEGER DEFAULT 0,
-                circles_received INTEGER DEFAULT 0,
-                created_at TEXT DEFAULT (datetime('now')),
-                last_active TEXT DEFAULT (datetime('now'))
+                created_at TEXT DEFAULT (datetime('now'))
             );
 
-            CREATE TABLE IF NOT EXISTS roulette_queue (
+            CREATE TABLE IF NOT EXISTS whispers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
+                author_id INTEGER NOT NULL,
                 file_id TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                category TEXT NOT NULL,
+                listens_count INTEGER DEFAULT 0,
+                reactions_count INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
                 created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                FOREIGN KEY (author_id) REFERENCES users(user_id)
             );
 
-            CREATE TABLE IF NOT EXISTS dialog_queue (
-                user_id INTEGER PRIMARY KEY,
+            CREATE TABLE IF NOT EXISTS listens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                whisper_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
                 created_at TEXT DEFAULT (datetime('now')),
-                FOREIGN KEY (user_id) REFERENCES users(user_id)
+                FOREIGN KEY (whisper_id) REFERENCES whispers(id),
+                FOREIGN KEY (user_id) REFERENCES users(user_id),
+                UNIQUE(whisper_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS reactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                whisper_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                reaction_type TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (whisper_id) REFERENCES whispers(id),
+                FOREIGN KEY (user_id) REFERENCES users(user_id),
+                UNIQUE(whisper_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS whisper_backs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                original_whisper_id INTEGER NOT NULL,
+                from_user_id INTEGER NOT NULL,
+                file_id TEXT NOT NULL,
+                file_type TEXT NOT NULL,
+                is_read INTEGER DEFAULT 0,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (original_whisper_id) REFERENCES whispers(id),
+                FOREIGN KEY (from_user_id) REFERENCES users(user_id)
             );
 
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 reporter_id INTEGER NOT NULL,
-                reported_id INTEGER NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
+                whisper_id INTEGER NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                UNIQUE(reporter_id, whisper_id)
             );
+
+            CREATE INDEX IF NOT EXISTS idx_whispers_category
+                ON whispers(category, is_active);
+            CREATE INDEX IF NOT EXISTS idx_whispers_author
+                ON whispers(author_id);
+            CREATE INDEX IF NOT EXISTS idx_listens_user
+                ON listens(user_id);
+            CREATE INDEX IF NOT EXISTS idx_reactions_whisper
+                ON reactions(whisper_id);
+            CREATE INDEX IF NOT EXISTS idx_whisper_backs_original
+                ON whisper_backs(original_whisper_id);
         """)
         await self._db.commit()
 
-    # ── User operations ──
+    # ── Users ──
 
     async def get_or_create_user(self, user_id: int) -> dict:
         cursor = await self._db.execute(
@@ -82,182 +124,257 @@ class Database:
         row = await cursor.fetchone()
         return bool(row and row["is_banned"])
 
-    async def set_mode(self, user_id: int, mode: str | None) -> None:
-        await self._db.execute(
-            "UPDATE users SET mode = ?, last_active = datetime('now') WHERE user_id = ?",
-            (mode, user_id),
-        )
-        await self._db.commit()
-
     async def get_user_stats(self, user_id: int) -> dict:
         cursor = await self._db.execute(
-            "SELECT circles_sent, circles_received, created_at FROM users WHERE user_id = ?",
+            "SELECT whispers_sent, whispers_listened, reactions_received, "
+            "whisper_backs_received, created_at FROM users WHERE user_id = ?",
             (user_id,),
         )
         row = await cursor.fetchone()
         if row:
             return dict(row)
-        return {"circles_sent": 0, "circles_received": 0, "created_at": "N/A"}
-
-    async def increment_sent(self, user_id: int) -> None:
-        await self._db.execute(
-            "UPDATE users SET circles_sent = circles_sent + 1, last_active = datetime('now') WHERE user_id = ?",
-            (user_id,),
-        )
-        await self._db.commit()
-
-    async def increment_received(self, user_id: int) -> None:
-        await self._db.execute(
-            "UPDATE users SET circles_received = circles_received + 1 WHERE user_id = ?",
-            (user_id,),
-        )
-        await self._db.commit()
+        return {
+            "whispers_sent": 0,
+            "whispers_listened": 0,
+            "reactions_received": 0,
+            "whisper_backs_received": 0,
+            "created_at": "N/A",
+        }
 
     async def get_total_users(self) -> int:
         cursor = await self._db.execute("SELECT COUNT(*) as cnt FROM users")
         row = await cursor.fetchone()
         return row["cnt"]
 
-    # ── Roulette queue ──
-
-    async def add_to_roulette_queue(self, user_id: int, file_id: str) -> None:
-        await self._db.execute(
-            "INSERT INTO roulette_queue (user_id, file_id) VALUES (?, ?)",
-            (user_id, file_id),
-        )
-        await self._db.commit()
-
-    async def pop_from_roulette_queue(self, exclude_user_id: int) -> dict | None:
+    async def get_total_whispers(self) -> int:
         cursor = await self._db.execute(
-            "SELECT id, user_id, file_id FROM roulette_queue "
-            "WHERE user_id != ? ORDER BY created_at ASC LIMIT 1",
-            (exclude_user_id,),
+            "SELECT COUNT(*) as cnt FROM whispers WHERE is_active = 1"
         )
         row = await cursor.fetchone()
-        if not row:
-            return None
-        result = dict(row)
-        await self._db.execute(
-            "DELETE FROM roulette_queue WHERE id = ?", (result["id"],)
-        )
-        await self._db.commit()
-        return result
+        return row["cnt"]
 
-    async def remove_user_from_roulette(self, user_id: int) -> None:
-        await self._db.execute(
-            "DELETE FROM roulette_queue WHERE user_id = ?", (user_id,)
-        )
-        await self._db.commit()
+    # ── Whispers ──
 
-    # ── Dialog queue & pairing ──
-
-    async def add_to_dialog_queue(self, user_id: int) -> None:
-        await self._db.execute(
-            "INSERT OR REPLACE INTO dialog_queue (user_id) VALUES (?)",
-            (user_id,),
-        )
-        await self._db.commit()
-
-    async def pop_from_dialog_queue(self, exclude_user_id: int) -> int | None:
+    async def create_whisper(
+        self, author_id: int, file_id: str, file_type: str, category: str
+    ) -> int:
         cursor = await self._db.execute(
-            "SELECT user_id FROM dialog_queue WHERE user_id != ? "
-            "ORDER BY created_at ASC LIMIT 1",
-            (exclude_user_id,),
+            "INSERT INTO whispers (author_id, file_id, file_type, category) "
+            "VALUES (?, ?, ?, ?)",
+            (author_id, file_id, file_type, category),
         )
+        await self._db.execute(
+            "UPDATE users SET whispers_sent = whispers_sent + 1 WHERE user_id = ?",
+            (author_id,),
+        )
+        await self._db.commit()
+        return cursor.lastrowid
+
+    async def get_random_whisper(
+        self, user_id: int, category: str | None = None
+    ) -> dict | None:
+        if category:
+            cursor = await self._db.execute(
+                "SELECT w.* FROM whispers w "
+                "WHERE w.is_active = 1 AND w.author_id != ? AND w.category = ? "
+                "AND w.id NOT IN (SELECT whisper_id FROM listens WHERE user_id = ?) "
+                "ORDER BY RANDOM() LIMIT 1",
+                (user_id, category, user_id),
+            )
+        else:
+            cursor = await self._db.execute(
+                "SELECT w.* FROM whispers w "
+                "WHERE w.is_active = 1 AND w.author_id != ? "
+                "AND w.id NOT IN (SELECT whisper_id FROM listens WHERE user_id = ?) "
+                "ORDER BY RANDOM() LIMIT 1",
+                (user_id, user_id),
+            )
         row = await cursor.fetchone()
-        if not row:
-            return None
-        partner_id = row["user_id"]
-        await self._db.execute(
-            "DELETE FROM dialog_queue WHERE user_id = ?", (partner_id,)
-        )
-        await self._db.commit()
-        return partner_id
-
-    async def remove_from_dialog_queue(self, user_id: int) -> None:
-        await self._db.execute(
-            "DELETE FROM dialog_queue WHERE user_id = ?", (user_id,)
-        )
-        await self._db.commit()
-
-    async def set_dialog_partner(
-        self, user_id: int, partner_id: int | None
-    ) -> None:
-        await self._db.execute(
-            "UPDATE users SET dialog_partner_id = ?, last_active = datetime('now') WHERE user_id = ?",
-            (partner_id, user_id),
-        )
-        await self._db.commit()
-
-    async def get_dialog_partner(self, user_id: int) -> int | None:
-        cursor = await self._db.execute(
-            "SELECT dialog_partner_id FROM users WHERE user_id = ?",
-            (user_id,),
-        )
-        row = await cursor.fetchone()
-        if row and row["dialog_partner_id"]:
-            return row["dialog_partner_id"]
+        if row:
+            return dict(row)
         return None
 
-    async def clear_dialog_pair(self, user_id: int) -> int | None:
-        partner_id = await self.get_dialog_partner(user_id)
-        if partner_id:
+    async def mark_listened(self, whisper_id: int, user_id: int) -> None:
+        try:
             await self._db.execute(
-                "UPDATE users SET dialog_partner_id = NULL, mode = NULL WHERE user_id = ?",
-                (partner_id,),
+                "INSERT OR IGNORE INTO listens (whisper_id, user_id) VALUES (?, ?)",
+                (whisper_id, user_id),
             )
+            await self._db.execute(
+                "UPDATE whispers SET listens_count = listens_count + 1 WHERE id = ?",
+                (whisper_id,),
+            )
+            await self._db.execute(
+                "UPDATE users SET whispers_listened = whispers_listened + 1 "
+                "WHERE user_id = ?",
+                (user_id,),
+            )
+            await self._db.commit()
+        except Exception:
+            pass
+
+    async def get_whisper_by_id(self, whisper_id: int) -> dict | None:
+        cursor = await self._db.execute(
+            "SELECT * FROM whispers WHERE id = ?", (whisper_id,)
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+    # ── Reactions ──
+
+    async def add_reaction(
+        self, whisper_id: int, user_id: int, reaction_type: str
+    ) -> bool:
+        try:
+            await self._db.execute(
+                "INSERT OR REPLACE INTO reactions (whisper_id, user_id, reaction_type) "
+                "VALUES (?, ?, ?)",
+                (whisper_id, user_id, reaction_type),
+            )
+            await self._db.execute(
+                "UPDATE whispers SET reactions_count = "
+                "(SELECT COUNT(*) FROM reactions WHERE whisper_id = ?) "
+                "WHERE id = ?",
+                (whisper_id, whisper_id),
+            )
+            whisper = await self.get_whisper_by_id(whisper_id)
+            if whisper:
+                await self._db.execute(
+                    "UPDATE users SET reactions_received = "
+                    "(SELECT COUNT(*) FROM reactions r "
+                    "JOIN whispers w ON r.whisper_id = w.id "
+                    "WHERE w.author_id = ?) WHERE user_id = ?",
+                    (whisper["author_id"], whisper["author_id"]),
+                )
+            await self._db.commit()
+            return True
+        except Exception:
+            return False
+
+    async def get_whisper_reactions_summary(self, whisper_id: int) -> dict:
+        cursor = await self._db.execute(
+            "SELECT reaction_type, COUNT(*) as cnt FROM reactions "
+            "WHERE whisper_id = ? GROUP BY reaction_type",
+            (whisper_id,),
+        )
+        rows = await cursor.fetchall()
+        return {row["reaction_type"]: row["cnt"] for row in rows}
+
+    # ── Whisper backs ──
+
+    async def create_whisper_back(
+        self,
+        original_whisper_id: int,
+        from_user_id: int,
+        file_id: str,
+        file_type: str,
+    ) -> int:
+        cursor = await self._db.execute(
+            "INSERT INTO whisper_backs "
+            "(original_whisper_id, from_user_id, file_id, file_type) "
+            "VALUES (?, ?, ?, ?)",
+            (original_whisper_id, from_user_id, file_id, file_type),
+        )
+        whisper = await self.get_whisper_by_id(original_whisper_id)
+        if whisper:
+            await self._db.execute(
+                "UPDATE users SET whisper_backs_received = whisper_backs_received + 1 "
+                "WHERE user_id = ?",
+                (whisper["author_id"],),
+            )
+        await self._db.commit()
+        return cursor.lastrowid
+
+    # ── Inbox ──
+
+    async def get_unread_reactions(self, user_id: int, limit: int = 5) -> list[dict]:
+        cursor = await self._db.execute(
+            "SELECT r.reaction_type, r.created_at, w.id as whisper_id, w.category "
+            "FROM reactions r "
+            "JOIN whispers w ON r.whisper_id = w.id "
+            "WHERE w.author_id = ? "
+            "ORDER BY r.created_at DESC LIMIT ?",
+            (user_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def get_unread_whisper_backs(
+        self, user_id: int, limit: int = 5
+    ) -> list[dict]:
+        cursor = await self._db.execute(
+            "SELECT wb.*, w.category FROM whisper_backs wb "
+            "JOIN whispers w ON wb.original_whisper_id = w.id "
+            "WHERE w.author_id = ? AND wb.is_read = 0 "
+            "ORDER BY wb.created_at DESC LIMIT ?",
+            (user_id, limit),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+    async def mark_whisper_back_read(self, wb_id: int) -> None:
         await self._db.execute(
-            "UPDATE users SET dialog_partner_id = NULL WHERE user_id = ?",
-            (user_id,),
+            "UPDATE whisper_backs SET is_read = 1 WHERE id = ?", (wb_id,)
         )
         await self._db.commit()
-        return partner_id
+
+    async def get_inbox_count(self, user_id: int) -> int:
+        cursor = await self._db.execute(
+            "SELECT COUNT(*) as cnt FROM whisper_backs wb "
+            "JOIN whispers w ON wb.original_whisper_id = w.id "
+            "WHERE w.author_id = ? AND wb.is_read = 0",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        return row["cnt"]
 
     # ── Reports ──
 
-    async def report_user(self, reporter_id: int, reported_id: int) -> int:
-        await self._db.execute(
-            "INSERT INTO reports (reporter_id, reported_id) VALUES (?, ?)",
-            (reporter_id, reported_id),
-        )
+    async def report_whisper(
+        self, reporter_id: int, whisper_id: int, threshold: int
+    ) -> tuple[bool, bool]:
+        """Returns (reported_ok, user_banned)."""
+        try:
+            await self._db.execute(
+                "INSERT INTO reports (reporter_id, whisper_id) VALUES (?, ?)",
+                (reporter_id, whisper_id),
+            )
+        except Exception:
+            return False, False
+
+        whisper = await self.get_whisper_by_id(whisper_id)
+        if not whisper:
+            return False, False
+
+        author_id = whisper["author_id"]
         await self._db.execute(
             "UPDATE users SET reports_count = reports_count + 1 WHERE user_id = ?",
-            (reported_id,),
+            (author_id,),
         )
-        await self._db.commit()
 
         cursor = await self._db.execute(
-            "SELECT reports_count FROM users WHERE user_id = ?",
-            (reported_id,),
+            "SELECT reports_count FROM users WHERE user_id = ?", (author_id,)
         )
         row = await cursor.fetchone()
-        return row["reports_count"]
+        banned = False
+        if row and row["reports_count"] >= threshold:
+            await self._db.execute(
+                "UPDATE users SET is_banned = 1 WHERE user_id = ?", (author_id,)
+            )
+            await self._db.execute(
+                "UPDATE whispers SET is_active = 0 WHERE author_id = ?",
+                (author_id,),
+            )
+            banned = True
+
+        await self._db.commit()
+        return True, banned
 
     async def ban_user(self, user_id: int) -> None:
         await self._db.execute(
             "UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,)
         )
-        await self.remove_user_from_roulette(user_id)
-        await self.remove_from_dialog_queue(user_id)
-        partner_id = await self.clear_dialog_pair(user_id)
-        await self._db.commit()
-        return partner_id
-
-    # ── Cleanup ──
-
-    async def cleanup_stale_dialogs(self, timeout_hours: int) -> list[tuple[int, int]]:
-        threshold = (
-            datetime.now(tz=timezone.utc) - timedelta(hours=timeout_hours)
-        ).strftime("%Y-%m-%d %H:%M:%S")
-        cursor = await self._db.execute(
-            "SELECT user_id, dialog_partner_id FROM users "
-            "WHERE mode = 'dialog' AND dialog_partner_id IS NOT NULL "
-            "AND last_active < ?",
-            (threshold,),
+        await self._db.execute(
+            "UPDATE whispers SET is_active = 0 WHERE author_id = ?", (user_id,)
         )
-        stale = await cursor.fetchall()
-        pairs = []
-        for row in stale:
-            pairs.append((row["user_id"], row["dialog_partner_id"]))
-            await self.clear_dialog_pair(row["user_id"])
-        return pairs
+        await self._db.commit()

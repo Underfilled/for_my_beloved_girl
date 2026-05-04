@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from bot.config import Config
 from bot.database import Database
-from bot.handlers import common, dialog, roulette, start
+from bot.handlers import common, inbox, listen, record, start
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,8 +34,9 @@ async def main() -> None:
 
     dp.include_routers(
         start.router,
-        roulette.router,
-        dialog.router,
+        record.router,
+        listen.router,
+        inbox.router,
         common.router,  # must be last (catch-all handler)
     )
 

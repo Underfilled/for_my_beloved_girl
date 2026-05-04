@@ -4,100 +4,75 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from bot.database import Database
-from bot.keyboards import back_menu_kb, dialog_chat_kb, main_menu_kb
-from bot.states import UserState
+from bot.keyboards import back_menu_kb, main_menu_kb
 
 router = Router()
 
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message, db: Database) -> None:
-    stats = await db.get_user_stats(message.from_user.id)
-    total = await db.get_total_users()
-    await message.answer(
-        "\U0001f4ca <b>Твоя статистика</b>\n\n"
-        f"\U0001f3a5 Кружков отправлено: <b>{stats['circles_sent']}</b>\n"
-        f"\U0001f4e9 Кружков получено: <b>{stats['circles_received']}</b>\n"
-        f"\U0001f4c5 В боте с: <b>{stats['created_at'][:10]}</b>\n\n"
-        f"\U0001f465 Всего пользователей: <b>{total}</b>",
-        reply_markup=back_menu_kb(),
-    )
+    await _send_stats(message, db)
 
 
 @router.callback_query(F.data == "stats")
 async def cb_stats(callback: CallbackQuery, db: Database) -> None:
-    stats = await db.get_user_stats(callback.from_user.id)
-    total = await db.get_total_users()
+    user_id = callback.from_user.id
+    stats = await db.get_user_stats(user_id)
+    total_users = await db.get_total_users()
+    total_whispers = await db.get_total_whispers()
+
     await callback.message.edit_text(
-        "\U0001f4ca <b>Твоя статистика</b>\n\n"
-        f"\U0001f3a5 Кружков отправлено: <b>{stats['circles_sent']}</b>\n"
-        f"\U0001f4e9 Кружков получено: <b>{stats['circles_received']}</b>\n"
-        f"\U0001f4c5 В боте с: <b>{stats['created_at'][:10]}</b>\n\n"
-        f"\U0001f465 Всего пользователей: <b>{total}</b>",
+        "\U0001f4ca <b>\u0422\u0432\u043e\u044f \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430</b>\n\n"
+        f"\U0001f3a4 \u0428\u0451\u043f\u043e\u0442\u043e\u0432 \u0437\u0430\u043f\u0438\u0441\u0430\u043d\u043e: "
+        f"<b>{stats['whispers_sent']}</b>\n"
+        f"\U0001f442 \u041f\u0440\u043e\u0441\u043b\u0443\u0448\u0430\u043d\u043e: "
+        f"<b>{stats['whispers_listened']}</b>\n"
+        f"\u2764\ufe0f \u0420\u0435\u0430\u043a\u0446\u0438\u0439 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u043e: "
+        f"<b>{stats['reactions_received']}</b>\n"
+        f"\U0001f4ac \u041e\u0442\u0432\u0435\u0442\u043d\u044b\u0445 \u0448\u0451\u043f\u043e\u0442\u043e\u0432: "
+        f"<b>{stats['whisper_backs_received']}</b>\n"
+        f"\U0001f4c5 \u0412 \u0431\u043e\u0442\u0435 \u0441: "
+        f"<b>{stats['created_at'][:10]}</b>\n\n"
+        f"\U0001f465 \u0412\u0441\u0435\u0433\u043e \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439: "
+        f"<b>{total_users}</b>\n"
+        f"\U0001f92b \u0412\u0441\u0435\u0433\u043e \u0448\u0451\u043f\u043e\u0442\u043e\u0432: "
+        f"<b>{total_whispers}</b>",
         reply_markup=back_menu_kb(),
     )
     await callback.answer()
 
 
-@router.callback_query(F.data == "report_partner")
-async def cb_report_partner(
-    callback: CallbackQuery, state: FSMContext, db: Database
-) -> None:
-    user_id = callback.from_user.id
-    current_state = await state.get_state()
+async def _send_stats(message: Message, db: Database) -> None:
+    user_id = message.from_user.id
+    stats = await db.get_user_stats(user_id)
+    total_users = await db.get_total_users()
+    total_whispers = await db.get_total_whispers()
 
-    if current_state != UserState.dialog_chatting.state:
-        await callback.answer(
-            "\u26a0\ufe0f Пожаловаться можно только в режиме Диалог.",
-            show_alert=True,
-        )
-        return
-
-    partner_id = await db.get_dialog_partner(user_id)
-    if not partner_id:
-        await callback.answer(
-            "\u26a0\ufe0f Нет активного собеседника.", show_alert=True
-        )
-        return
-
-    from bot.config import Config
-    import os
-
-    config = Config.from_env()
-    reports = await db.report_user(user_id, partner_id)
-
-    if reports >= config.report_threshold:
-        banned_partner = await db.ban_user(partner_id)
-        try:
-            await callback.bot.send_message(
-                partner_id,
-                "\u26d4 Вы заблокированы за нарушение правил.",
-            )
-        except Exception:
-            pass
-
-        from bot.handlers.dialog import notify_partner_left
-        old_partner = await db.clear_dialog_pair(user_id)
-
-        await callback.message.edit_text(
-            "\U0001f6a8 Жалоба отправлена. Пользователь заблокирован.\n"
-            "Выбери режим \u2b07\ufe0f",
-            reply_markup=main_menu_kb(),
-        )
-        await db.set_mode(user_id, None)
-        await state.clear()
-        await state.set_state(UserState.choosing_mode)
-    else:
-        await callback.answer(
-            "\U0001f6a8 Жалоба отправлена. Спасибо!", show_alert=True
-        )
+    await message.answer(
+        "\U0001f4ca <b>\u0422\u0432\u043e\u044f \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430</b>\n\n"
+        f"\U0001f3a4 \u0428\u0451\u043f\u043e\u0442\u043e\u0432 \u0437\u0430\u043f\u0438\u0441\u0430\u043d\u043e: "
+        f"<b>{stats['whispers_sent']}</b>\n"
+        f"\U0001f442 \u041f\u0440\u043e\u0441\u043b\u0443\u0448\u0430\u043d\u043e: "
+        f"<b>{stats['whispers_listened']}</b>\n"
+        f"\u2764\ufe0f \u0420\u0435\u0430\u043a\u0446\u0438\u0439 \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u043e: "
+        f"<b>{stats['reactions_received']}</b>\n"
+        f"\U0001f4ac \u041e\u0442\u0432\u0435\u0442\u043d\u044b\u0445 \u0448\u0451\u043f\u043e\u0442\u043e\u0432: "
+        f"<b>{stats['whisper_backs_received']}</b>\n"
+        f"\U0001f4c5 \u0412 \u0431\u043e\u0442\u0435 \u0441: "
+        f"<b>{stats['created_at'][:10]}</b>\n\n"
+        f"\U0001f465 \u0412\u0441\u0435\u0433\u043e \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439: "
+        f"<b>{total_users}</b>\n"
+        f"\U0001f92b \u0412\u0441\u0435\u0433\u043e \u0448\u0451\u043f\u043e\u0442\u043e\u0432: "
+        f"<b>{total_whispers}</b>",
+        reply_markup=back_menu_kb(),
+    )
 
 
 @router.message()
 async def handle_unknown(message: Message, state: FSMContext) -> None:
-    current_state = await state.get_state()
-    if current_state is None:
+    current = await state.get_state()
+    if current is None:
         await message.answer(
-            "Нажми /start чтобы начать!",
+            "\u041d\u0430\u0436\u043c\u0438 /start \u0447\u0442\u043e\u0431\u044b \u043d\u0430\u0447\u0430\u0442\u044c!",
             reply_markup=main_menu_kb(),
         )

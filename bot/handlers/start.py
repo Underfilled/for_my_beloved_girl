@@ -1,46 +1,50 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from bot.database import Database
-from bot.keyboards import main_menu_kb, roulette_kb, dialog_search_kb
+from bot.keyboards import back_menu_kb, main_menu_kb
 from bot.states import UserState
 
 router = Router()
 
 WELCOME_TEXT = (
-    "\U0001f504 <b>КругоВорот</b> \u2014 анонимный мессенджер на кружочках!\n\n"
-    "Запиши кружок \u2014 получи кружок от незнакомца.\n"
-    "Полная анонимность. Никаких текстов, только голосовые кружки.\n\n"
-    "<b>Режимы:</b>\n"
-    "\U0001f3b2 <b>Рулетка</b> \u2014 отправь кружок, получи от случайного человека. "
-    "Твой кружок улетит кому-то третьему.\n"
-    "\U0001f4ac <b>Диалог</b> \u2014 найди собеседника и общайтесь кружочками "
-    "сколько хотите.\n\n"
-    "Выбери режим \u2b07\ufe0f"
+    "\U0001f92b <b>\u0428\u0451\u043f\u043e\u0442</b> \u2014 "
+    "\u0430\u043d\u043e\u043d\u0438\u043c\u043d\u044b\u0435 \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u044b\u0435 "
+    "\u0438\u0441\u043f\u043e\u0432\u0435\u0434\u0438\n\n"
+    "\u0417\u0430\u043f\u0438\u0448\u0438 \u0441\u0432\u043e\u044e \u0438\u0441\u0442\u043e\u0440\u0438\u044e, "
+    "\u0441\u0435\u043a\u0440\u0435\u0442 \u0438\u043b\u0438 \u043c\u044b\u0441\u043b\u044c \u2014 "
+    "\u043a\u0442\u043e-\u0442\u043e \u0443\u0441\u043b\u044b\u0448\u0438\u0442.\n"
+    "\u0421\u043b\u0443\u0448\u0430\u0439 \u0447\u0443\u0436\u0438\u0435 \u0448\u0451\u043f\u043e\u0442\u044b, "
+    "\u0440\u0435\u0430\u0433\u0438\u0440\u0443\u0439, \u0448\u0435\u043f\u0447\u0438 \u0432 \u043e\u0442\u0432\u0435\u0442.\n\n"
+    "\U0001f510 \u041f\u043e\u043b\u043d\u0430\u044f \u0430\u043d\u043e\u043d\u0438\u043c\u043d\u043e\u0441\u0442\u044c. "
+    "\u041d\u0438\u043a\u0442\u043e \u043d\u0435 \u0443\u0437\u043d\u0430\u0435\u0442, \u043a\u0442\u043e \u0442\u044b."
 )
 
 HELP_TEXT = (
-    "\U0001f504 <b>КругоВорот \u2014 Помощь</b>\n\n"
-    "<b>Как это работает?</b>\n"
-    "Ты записываешь видео-кружок \u2014 и получаешь кружок от другого человека. "
-    "Всё анонимно!\n\n"
-    "<b>\U0001f3b2 Рулетка</b>\n"
-    "Запиши кружок \u2192 получи кружок от случайного человека. "
-    "Твой кружок полетит уже третьему. Каждый раз новые люди!\n\n"
-    "<b>\U0001f4ac Диалог</b>\n"
-    "Найди собеседника и обменивайтесь кружочками. "
-    'Нажми "\u23ed\ufe0f Следующий" чтобы найти нового. '
-    "Хочешь поделиться контактом? Напиши его на листочке в кружке!\n\n"
-    "<b>\U0001f6a8 Жалоба</b>\n"
-    "Если получил неприемлемый контент \u2014 нажми кнопку жалобы. "
-    "После нескольких жалоб пользователь будет заблокирован.\n\n"
-    "<b>Команды:</b>\n"
-    "/start \u2014 главное меню\n"
-    "/help \u2014 помощь\n"
-    "/stats \u2014 статистика\n"
-    "/cancel \u2014 выйти из режима"
+    "\U0001f92b <b>\u0428\u0451\u043f\u043e\u0442 \u2014 \u041f\u043e\u043c\u043e\u0449\u044c</b>\n\n"
+    "<b>\u041a\u0430\u043a \u044d\u0442\u043e \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442?</b>\n"
+    "\u0417\u0430\u043f\u0438\u0441\u044b\u0432\u0430\u0439 \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u044b\u0435 \u0438\u043b\u0438 "
+    "\u0432\u0438\u0434\u0435\u043e-\u043a\u0440\u0443\u0436\u043e\u0447\u043a\u0438 \u0441 \u0438\u0441\u0442\u043e\u0440\u0438\u044f\u043c\u0438, "
+    "\u0441\u0435\u043a\u0440\u0435\u0442\u0430\u043c\u0438 \u0438 \u043c\u044b\u0441\u043b\u044f\u043c\u0438 \u2014 "
+    "\u0430\u043d\u043e\u043d\u0438\u043c\u043d\u043e!\n\n"
+    "<b>\U0001f3a4 \u0417\u0430\u043f\u0438\u0441\u0430\u0442\u044c \u0448\u0451\u043f\u043e\u0442</b>\n"
+    "\u0412\u044b\u0431\u0435\u0440\u0438 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e \u2192 "
+    "\u0437\u0430\u043f\u0438\u0448\u0438 \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0435 \u0438\u043b\u0438 \u043a\u0440\u0443\u0436\u043e\u043a \u2192 "
+    "\u0442\u0432\u043e\u0439 \u0448\u0451\u043f\u043e\u0442 \u0443\u0441\u043b\u044b\u0448\u0430\u0442 \u0434\u0440\u0443\u0433\u0438\u0435!\n\n"
+    "<b>\U0001f442 \u0421\u043b\u0443\u0448\u0430\u0442\u044c</b>\n"
+    "\u041f\u043e\u043b\u0443\u0447\u0430\u0439 \u0441\u043b\u0443\u0447\u0430\u0439\u043d\u044b\u0435 \u0448\u0451\u043f\u043e\u0442\u044b. "
+    "\u0420\u0435\u0430\u0433\u0438\u0440\u0443\u0439: \u2764\ufe0f \U0001f917 \U0001f622 \U0001f62e\n"
+    "\u041c\u043e\u0436\u0435\u0448\u044c \u0448\u0435\u043f\u043d\u0443\u0442\u044c \u0432 \u043e\u0442\u0432\u0435\u0442 \u2014 "
+    "\u0430\u0432\u0442\u043e\u0440 \u043f\u043e\u043b\u0443\u0447\u0438\u0442 \u0430\u043d\u043e\u043d\u0438\u043c\u043d\u043e!\n\n"
+    "<b>\U0001f4ec \u0412\u0445\u043e\u0434\u044f\u0449\u0438\u0435</b>\n"
+    "\u0420\u0435\u0430\u043a\u0446\u0438\u0438 \u043d\u0430 \u0442\u0432\u043e\u0438 \u0448\u0451\u043f\u043e\u0442\u044b + "
+    "\u043e\u0442\u0432\u0435\u0442\u043d\u044b\u0435 \u0448\u0451\u043f\u043e\u0442\u044b.\n\n"
+    "<b>\u041a\u043e\u043c\u0430\u043d\u0434\u044b:</b>\n"
+    "/start \u2014 \u0433\u043b\u0430\u0432\u043d\u043e\u0435 \u043c\u0435\u043d\u044e\n"
+    "/help \u2014 \u043f\u043e\u043c\u043e\u0449\u044c\n"
+    "/stats \u2014 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430"
 )
 
 
@@ -48,121 +52,27 @@ HELP_TEXT = (
 async def cmd_start(message: Message, state: FSMContext, db: Database) -> None:
     await db.get_or_create_user(message.from_user.id)
     if await db.is_banned(message.from_user.id):
-        await message.answer(
-            "\u26d4 Вы заблокированы за нарушение правил."
-        )
+        await message.answer("\u26d4 \u0412\u044b \u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d\u044b \u0437\u0430 \u043d\u0430\u0440\u0443\u0448\u0435\u043d\u0438\u0435 \u043f\u0440\u0430\u0432\u0438\u043b.")
         return
     await state.clear()
-    await state.set_state(UserState.choosing_mode)
+    await state.set_state(UserState.main_menu)
     await message.answer(WELCOME_TEXT, reply_markup=main_menu_kb())
 
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(HELP_TEXT)
-
-
-@router.message(Command("cancel"))
-async def cmd_cancel(message: Message, state: FSMContext, db: Database) -> None:
-    user_id = message.from_user.id
-    current_state = await state.get_state()
-
-    if current_state == UserState.dialog_chatting.state:
-        partner_id = await db.clear_dialog_pair(user_id)
-        if partner_id:
-            from bot.handlers.dialog import notify_partner_left
-            await notify_partner_left(message.bot, partner_id)
-
-    await db.remove_user_from_roulette(user_id)
-    await db.remove_from_dialog_queue(user_id)
-    await db.set_mode(user_id, None)
-    await state.clear()
-    await state.set_state(UserState.choosing_mode)
-    await message.answer(
-        "\u2705 Вы вернулись в главное меню.", reply_markup=main_menu_kb()
-    )
-
-
-@router.callback_query(F.data == "back_menu")
-async def cb_back_menu(
-    callback: CallbackQuery, state: FSMContext, db: Database
-) -> None:
-    user_id = callback.from_user.id
-    current_state = await state.get_state()
-
-    if current_state == UserState.dialog_chatting.state:
-        partner_id = await db.clear_dialog_pair(user_id)
-        if partner_id:
-            from bot.handlers.dialog import notify_partner_left
-            await notify_partner_left(callback.bot, partner_id)
-
-    await db.remove_user_from_roulette(user_id)
-    await db.remove_from_dialog_queue(user_id)
-    await db.set_mode(user_id, None)
-    await state.clear()
-    await state.set_state(UserState.choosing_mode)
-    await callback.message.edit_text(
-        WELCOME_TEXT, reply_markup=main_menu_kb()
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data == "mode_roulette")
-async def cb_mode_roulette(
-    callback: CallbackQuery, state: FSMContext, db: Database
-) -> None:
-    user_id = callback.from_user.id
-    if await db.is_banned(user_id):
-        await callback.answer("\u26d4 Вы заблокированы.", show_alert=True)
-        return
-    await db.set_mode(user_id, "roulette")
-    await state.set_state(UserState.roulette)
-    await callback.message.edit_text(
-        "\U0001f3b2 <b>Режим Рулетка</b>\n\n"
-        "Запиши и отправь видео-кружок \U0001f3a5\n"
-        "Ты получишь кружок от другого человека, "
-        "а твой улетит кому-то ещё!",
-        reply_markup=roulette_kb(),
-    )
-    await callback.answer()
-
-
-@router.callback_query(F.data == "mode_dialog")
-async def cb_mode_dialog(
-    callback: CallbackQuery, state: FSMContext, db: Database
-) -> None:
-    user_id = callback.from_user.id
-    if await db.is_banned(user_id):
-        await callback.answer("\u26d4 Вы заблокированы.", show_alert=True)
-        return
-    await db.set_mode(user_id, "dialog")
-
-    partner_id = await db.pop_from_dialog_queue(user_id)
-    if partner_id:
-        await db.set_dialog_partner(user_id, partner_id)
-        await db.set_dialog_partner(partner_id, user_id)
-        await state.set_state(UserState.dialog_chatting)
-
-        from bot.handlers.dialog import dialog_chat_kb, notify_partner_found
-        await callback.message.edit_text(
-            "\U0001f4ac <b>Собеседник найден!</b>\n\n"
-            "Запишите видео-кружок, чтобы начать общение \U0001f3a5",
-            reply_markup=dialog_chat_kb(),
-        )
-        await notify_partner_found(callback.bot, partner_id)
-    else:
-        await db.add_to_dialog_queue(user_id)
-        await state.set_state(UserState.dialog_searching)
-        await callback.message.edit_text(
-            "\U0001f50e <b>Ищем собеседника...</b>\n\n"
-            "Как только кто-то тоже захочет поболтать \u2014 мы вас соединим!",
-            reply_markup=dialog_search_kb(),
-        )
-    await callback.answer()
+    await message.answer(HELP_TEXT, reply_markup=back_menu_kb())
 
 
 @router.callback_query(F.data == "help")
 async def cb_help(callback: CallbackQuery) -> None:
-    from bot.keyboards import back_menu_kb
     await callback.message.edit_text(HELP_TEXT, reply_markup=back_menu_kb())
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_menu")
+async def cb_back_menu(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.clear()
+    await state.set_state(UserState.main_menu)
+    await callback.message.edit_text(WELCOME_TEXT, reply_markup=main_menu_kb())
     await callback.answer()
